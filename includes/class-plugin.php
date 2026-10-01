@@ -25,6 +25,7 @@ class EditorialFlow_Plugin {
 	private $admin;
 	private $settings;
 	private $history;
+	private $rest_api;
 
 	/**
 	 * Prevent direct construction outside this class.
@@ -37,9 +38,14 @@ class EditorialFlow_Plugin {
 		);
 
 		$this->admin = new EditorialFlow_Admin(
-			$this->editorial_status
+			$this->editorial_status,
+			$this->history
 		);
 		$this->settings = new EditorialFlow_Settings();
+
+		$this->rest_api = new EditorialFlow_REST_API(
+			$this->editorial_status
+		);
 	}
 
 	/**
@@ -65,6 +71,7 @@ class EditorialFlow_Plugin {
 
 		$this->admin->register_hooks();
 		$this->settings->register_hooks();
+		$this->rest_api->register_hooks();
 	}
 
 	/**

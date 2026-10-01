@@ -3,7 +3,7 @@
  * Plugin Name:       EditorialFlow
  * Plugin URI:        /#
  * Description:       Lightweight editorial workflow tracking for WordPress posts.
- * Version:           0.1.0
+ * Version:           1.0.0
  * Requires at least: 6.4
  * Requires PHP:      7.4
  * Author:            Jaimin
@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'EDITORIALFLOW_VERSION', '0.1.0' );
+define( 'EDITORIALFLOW_VERSION', '1.0.0' );
 define( 'EDITORIALFLOW_FILE', __FILE__ );
 define( 'EDITORIALFLOW_PATH', plugin_dir_path( __FILE__ ) );
 define( 'EDITORIALFLOW_URL', plugin_dir_url( __FILE__ ) );

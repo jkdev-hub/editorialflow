@@ -1,5 +1,4 @@
 <?php
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -10,14 +9,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 class EditorialFlow_Admin {
 
 	private $editorial_status;
-
+	private $history;
 	/**
 	 * Initialize the admin class.
 	 *
 	 * @param EditorialFlow_Editorial_Status $editorial_status Editorial status handler.
+	 * @param EditorialFlow_History $history history handler.
 	 */
-	public function __construct( $editorial_status ) {
+	public function __construct( $editorial_status, $history ) {
 		$this->editorial_status = $editorial_status;
+		$this->history          = $history;
 	}
 
 	/**
@@ -30,6 +31,28 @@ class EditorialFlow_Admin {
 		add_action( 'save_post', array( $this, 'save_meta_box' ) );
 		add_filter( 'manage_posts_columns', array( $this, 'add_status_column' ) );
 		add_action( 'manage_posts_custom_column', array( $this, 'render_status_column' ), 10, 2 );
+		add_action( 'admin_post_editorialflow_delete_history', array( $this, 'delete_history' ));
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
+	}
+
+	/**
+	 * Enqueue admin scripts.
+	 *
+	 * @param string $hook Current admin page.
+	 * @return void
+	 */
+	public function enqueue_scripts( $hook ) {
+		if ( 'post.php' !== $hook && 'post-new.php' !== $hook ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'editorialflow-admin',
+			EDITORIALFLOW_URL . 'assets/js/editorialflow-admin.js',
+			array( 'wp-api-fetch' ),
+			EDITORIALFLOW_VERSION,
+			true
+		);
 	}
 	/**
 	 * Add the editorial status column.
@@ -57,7 +80,6 @@ class EditorialFlow_Admin {
 
 		$status   = $this->editorial_status->get_status( $post_id );
 		$statuses = $this->editorial_status->get_statuses();
-
 		if ( isset( $statuses[ $status ] ) ) {
 			echo esc_html( $statuses[ $status ] );
 		}
@@ -88,42 +110,57 @@ class EditorialFlow_Admin {
 		$statuses       = $this->editorial_status->get_statuses();
 		$reviewer_name  = $this->editorial_status->get_reviewer_name( $post->ID );
 		$editorial_note = $this->editorial_status->get_editorial_note( $post->ID );
+		$history = $this->editorial_status->get_history( $post->ID );
 		wp_nonce_field(
 			'editorialflow_save_status',
 			'editorialflow_status_nonce'
 		); ?>
 		<p>
-			<label for="editorialflow_status">
+			<label for="editorialflow_status_select">
 				<?php esc_html_e( 'Editorial Status', 'editorialflow' ); ?>
 			</label>
 		</p>
 		<p>
-			<select name="editorialflow_status" id="editorialflow_status" class="widefat">
+			<select name="editorialflow_status" id="editorialflow_status_select" class="widefat">
 				<?php foreach ( $statuses as $value => $label ) : ?>
-					<option value="<?php echo esc_attr( $value ); ?>"
-						<?php selected( $current_status, $value ); ?>>
-						<?php echo esc_html( $label ); ?>
-					</option>
+					<option value="<?php echo esc_attr( $value ); ?>"<?php selected( $current_status, $value ); ?>><?php echo esc_html( $label ); ?></option>
 				<?php endforeach; ?>
 			</select>
 		</p>
-		<p>
-			<label for="editorialflow_reviewer_name">
-				<?php esc_html_e( 'Reviewer Name', 'editorialflow' ); ?>
-			</label>
-		</p>
-		<p>
-			<input type="text" id="editorialflow_reviewer_name" name="editorialflow_reviewer_name"
-				value="<?php echo esc_attr( $reviewer_name ); ?>" class="widefat" />
-		</p>
-		<p>
-			<label for="editorialflow_note"><?php esc_html_e( 'Editorial Note', 'editorialflow' ); ?></label>
-		</p>
-		<p>
-			<textarea id="editorialflow_note" name="editorialflow_note" class="widefat"rows="4"><?php echo esc_textarea( $editorial_note ); ?></textarea>
-		</p>
-		<?php
-	}
+		<p><label for="editorialflow_reviewer_name"><?php esc_html_e( 'Reviewer Name', 'editorialflow' ); ?></label></p>
+		<p><input type="text" id="editorialflow_reviewer_name" name="editorialflow_reviewer_name" value="<?php echo esc_attr( $reviewer_name ); ?>" class="widefat" /></p>
+		<p><label for="editorialflow_note"><?php esc_html_e( 'Editorial Note', 'editorialflow' ); ?></label></p>
+		<p><textarea id="editorialflow_note" name="editorialflow_note" class="widefat" rows="4"><?php echo esc_textarea( $editorial_note ); ?></textarea></p>
+		<hr>
+		<p><strong><?php esc_html_e( 'Status History', 'editorialflow' ); ?></strong></p>
+		<div id="editorialflow-history-list">
+			<?php if ( ! empty( $history ) ) : ?>
+				<?php foreach ( $history as $item ) : 
+					$history_id = absint( $item['id'] );
+					$delete_url = wp_nonce_url(
+						admin_url(
+							'admin-post.php?action=editorialflow_delete_history&history_id='
+							. $history_id
+						),
+						'editorialflow_delete_history_' . $history_id
+					);?>
+					<p>
+						<?php
+						echo esc_html(
+							$item['old_status'] . ' → ' . $item['new_status']
+						);?>
+						<a href="<?php echo esc_url( $delete_url ); ?>" onclick="return confirm('<?php echo esc_js( __( 'Delete this history record?', 'editorialflow' ) ); ?>');">
+							<?php esc_html_e( 'Delete', 'editorialflow' ); ?>
+						</a>
+					</p>
+				<?php endforeach; ?>
+			<?php endif; ?>
+		</div>
+		<button type="button" id="editorialflow-update-status" class="button" data-post-id="<?php echo esc_attr( $post->ID ); ?>">
+			<?php esc_html_e( 'Update Status', 'editorialflow' ); ?>
+		</button>
+		<span id="editorialflow-status-message"></span>
+	<?php }
 
 	/**
 	 * Save editorial status and reviewer data.
@@ -144,9 +181,7 @@ class EditorialFlow_Admin {
 		if (
 			! isset( $_POST['editorialflow_status_nonce'] ) ||
 			! wp_verify_nonce(
-				sanitize_text_field(
-					wp_unslash( $_POST['editorialflow_status_nonce'] )
-				),
+				wp_unslash( $_POST['editorialflow_status_nonce'] ),
 				'editorialflow_save_status'
 			)
 		) {
@@ -191,5 +226,30 @@ class EditorialFlow_Admin {
 				$editorial_note
 			);
 		}
+	}
+
+	/**
+	 * Delete a history record.
+	 *
+	 * @return void
+	 */
+	public function delete_history() {
+
+		if ( ! current_user_can( 'edit_posts' ) ) {
+			wp_die(esc_html__( 'You are not allowed to do this.', 'editorialflow' ));
+		}
+
+		$id = isset( $_GET['history_id'] ) ? absint( $_GET['history_id'] ) : 0;
+		if ( ! $id ) {
+			return;
+		}
+
+		check_admin_referer(
+			'editorialflow_delete_history_' . $id
+		);
+
+		$this->history->delete( $id );
+		wp_safe_redirect( wp_get_referer() );
+		exit;
 	}
 }

@@ -29,6 +29,16 @@ class EditorialFlow_Editorial_Status {
 	}
 
 	/**
+	 * Get editorial status history for a post.
+	 *
+	 * @param int $post_id Post ID.
+	 * @return array
+	 */
+	public function get_history( $post_id ) {
+		return $this->history->get_by_post( $post_id );
+	}
+
+	/**
 	 * Get available editorial statuses.
 	 *
 	 * @return array
@@ -63,7 +73,7 @@ class EditorialFlow_Editorial_Status {
 	 *
 	 * @param int    $post_id Post ID.
 	 * @param string $status  Editorial status.
-	 * @return bool|int
+	 * @return int|false
 	 */
 	public function update_status( $post_id, $status ) {
 		$statuses = $this->get_statuses();
@@ -75,7 +85,7 @@ class EditorialFlow_Editorial_Status {
 		$old_status = $this->get_status( $post_id );
 
 		if ( $old_status === $status ) {
-			return true;
+			return false;
 		}
 
 		$result = update_post_meta(
@@ -84,15 +94,15 @@ class EditorialFlow_Editorial_Status {
 			$status
 		);
 
-		if ( false !== $result ) {
-			$this->history->add(
-				$post_id,
-				$old_status,
-				$status
-			);
+		if ( false === $result ) {
+			return false;
 		}
 
-		return $result;
+		return $this->history->insert(
+			$post_id,
+			$old_status,
+			$status
+		);
 	}
 
     /**
